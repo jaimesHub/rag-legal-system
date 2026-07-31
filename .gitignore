@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
+
+# Secrets — never commit
+.env
+.env.local
+
+# Data: raw downloads and derived artifacts are reproducible, not source.
+# data/golden/ is NOT ignored — golden splits are committed so they stay
+# stable across weeks (see CLAUDE.md).
+data/raw/
+data/processed/
+artifacts/
+
+# Qdrant local storage (bind-mounted by docker-compose, if using a bind mount)
+qdrant_storage/
+
+# OS
+.DS_Store
