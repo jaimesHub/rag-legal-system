@@ -10,46 +10,49 @@ nguyên liệu cho Production Report ở T8.
 | [F-001](#f-001) | Data / embedding window | T0 | 🔴 |
 | [F-002](#f-002) | Data / leakage | T0 | ✅ |
 | [F-003](#f-003) | Data / duplicate | T0 | ✅ |
-| [F-004](#f-004) | Retrieval / lexical confusion | T0 → T2 | 🔴 *(đã định lượng, xem F-010)* |
 | [F-005](#f-005) | Harness / test isolation | T0 | ✅ |
 | [F-006](#f-006) | Harness / index contamination | T0 | ✅ |
-| [F-007](#f-007) | Metric / score incomparability | T2 | 🟡 |
-| [F-008](#f-008) | Library / silent zero-score results | T2 | ✅ |
-| [F-009](#f-009) | Method / aggregate hides churn | T2 | ✅ |
-| [F-010](#f-010) | Retrieval / article resolution | T2 | 🔴 **nút thắt chính** |
 | [F-011](#f-011) | Data / metadata parse | T2 | 🟡 |
+| [F-012](#f-012) | Process / documentation integrity | T0 (Phase 4) | ✅ |
+| [F-013](#f-013) | Harness / lint gap | T0 (Phase 3) | ✅ |
+| [F-014](#f-014) | Harness / silent dilution risk | T0 (Phase 4) | 🟡 |
 
 ---
 
 ## F-001
-### Điều luật dài bị cắt âm thầm khi embed
+### Điều luật dài có nguy cơ bị cắt âm thầm khi embed
 
 **Loại:** Data / embedding window · **Tuần:** T0 · **Trạng thái:** 🔴 chưa xử lý
 
-**Hiện tượng.** Với `chunk_strategy=article` (mặc định — corpus đã ở mức Điều), một số Điều
-dài hơn cửa sổ input của embedding model. Trên slice 500 Điều:
+**Hiện tượng.** Với `chunk_strategy=article` (mặc định — corpus đã ở mức Điều), phân phối độ
+dài Điều trên slice 500 văn bản gold-covering (đo từ `data/processed/ingest_audit.json`,
+xác nhận lại bằng `PROVIDER=fake make smoke` Phase 4):
 
-| Chỉ số | Giá trị |
+| Chỉ số | Giá trị (ký tự) |
 |---|---|
-| p50 / p90 / p99 độ dài | 888 / 3.515 / 9.954 ký tự |
-| max | **51.862 ký tự** (`20/2012/qh13+1`, title chỉ là "Điều 1.") |
-| Vượt cửa sổ 2.048 token của `gemini-embedding-001` (~7.168 ký tự) | 15 Điều = **3,0%** |
-| Tỷ lệ **ký tự** nằm ngoài cửa sổ | **11,7%** tổng text |
-| Vượt cửa sổ 8.192 token của `gemini-embedding-2` | 2 Điều |
+| mean | 1.400,2 |
+| p50 | 853 |
+| p90 | 2.914 |
+| p99 | 9.648 |
+| max | **15.635** |
 
-**Vì sao nghiêm trọng hơn con số 3% gợi ý.** API cắt input quá dài mà **không báo lỗi** →
-vector đại diện cho 1/7 đầu của điều luật, phần còn lại không tồn tại với retrieval. Điều
-càng dài càng thường là điều quan trọng (điều khoản sửa đổi, bảng chế tài), nên 3% Điều này
-gánh nhiều hơn 3% giá trị. Và vì im lặng, nó sẽ không xuất hiện ở bất kỳ metric nào ngoài
-một mức recall trần khó giải thích.
+**Vì sao đáng lo dù slice nhỏ.** p99 và max đã gấp hơn 10 lần trung vị — đuôi phân phối rất
+dày. Với cửa sổ input hữu hạn của bất kỳ embedding model nào (Gemini hay khác), các Điều ở
+đuôi này có nguy cơ bị cắt bớt khi encode, và API có thể cắt input quá dài mà **không báo
+lỗi** → vector chỉ đại diện cho phần đầu Điều, phần còn lại không tồn tại với retrieval. Điều
+càng dài càng thường là điều quan trọng (điều khoản sửa đổi, bảng chế tài), nên rủi ro này
+không tỷ lệ thuận đơn giản với số Điều bị ảnh hưởng. Và vì im lặng, nó sẽ không xuất hiện ở
+bất kỳ metric nào ngoài một mức recall trần khó giải thích.
 
 **Chưa xử lý vì** T0 chạy `PROVIDER=fake` (hash embedder không có giới hạn token) nên lỗi
-này chưa *biểu hiện*, chỉ mới được *đo*. Nó sẽ biểu hiện ngay khi bật Gemini.
+này chưa *biểu hiện*, chỉ mới được *đo* qua phân phối độ dài. Nó sẽ biểu hiện ngay khi bật
+Gemini.
 
-**Hướng xử lý (T3).** So ba lựa chọn trên cùng golden set: (a) `chunk_strategy=khoan` —
-cắt theo Khoản, giữ `doc_id` trỏ về Điều cha; (b) `gemini-embedding-2` với cửa sổ 8.192
-token; (c) cả hai. Cần một cảnh báo ở tầng ingest khi passage vượt ngưỡng token của model
-đang dùng — hiện chưa có, và đó là lý do lỗi này im lặng.
+**Hướng xử lý (T1/T3).** Khi bật Gemini, đo cụ thể bao nhiêu Điều/ký tự vượt cửa sổ token
+thật của model đang dùng, rồi so các lựa chọn trên cùng golden set: (a) `chunk_strategy=khoan`
+— cắt theo Khoản, giữ `doc_id` trỏ về Điều cha; (b) một model có cửa sổ context lớn hơn;
+(c) cả hai. Cần một cảnh báo ở tầng ingest khi passage vượt ngưỡng token của model đang dùng
+— hiện chưa có, và đó là lý do lỗi này im lặng.
 
 ---
 
@@ -84,43 +87,6 @@ kèm số dòng đã bỏ; `make verify` in ra con số này; ghi vào `manifest
 
 **Ghi chú thêm.** File JSONL gốc dùng khoá `_id`, còn config parquet MTEB dùng `id` — loader
 nhận cả hai. Nếu chỉ đọc một khoá thì hoặc mất toàn bộ query, hoặc phải đổi nguồn dữ liệu.
-
----
-
-## F-004
-### Retrieval nhầm theo từ chung, không theo ý
-
-**Loại:** Retrieval / lexical confusion · **Tuần:** T0 · **Trạng thái:** 🟡 đã giảm thiểu
-
-**Hiện tượng.** Query *"Mức phạt khi quay đầu xe ô tô trên đường cao tốc"* → top-1 là
-`01/2010/tt-bng+13` **"Điều 13. Quốc kỳ Việt Nam trên xe riêng của người đứng đầu cơ quan
-đại diện"** (score 0.2469), trong khi Điều đúng về xử phạt giao thông xếp thứ 2 (0.2446).
-Khoảng cách score chỉ **0,9%**.
-
-Các miss hoàn toàn ở k=10 cho thấy cùng một hình mẫu, và một biến thể đáng chú ý hơn:
-
-| Query | Expected | Got (top-3) |
-|---|---|---|
-| Bằng lái xe bị tước nhưng sắp hết hạn có được cấp đổi không? | `100/2019/nđ-cp+81` | `100/2019/nđ-cp+17`, `+37`, `+16` |
-| Không thỏa thuận về bồi thường thiệt hại có được bồi thường không? | `91/2015/qh13+418` | `91/2015/qh13+585`, … |
-
-**Vì sao đây là failure mode nguy hiểm nhất của dataset này.** Hai dòng trên retrieve **đúng
-văn bản luật, sai Điều** — cùng `doc_key`, lệch `article_index`. Đây không phải lỗi "không
-tìm thấy tài liệu" mà là lỗi **phân giải trong một tài liệu**, và nó sẽ không được khắc phục
-bằng cách làm embedding tốt hơn ở mức văn bản. Nó cần tín hiệu ở mức Điều/Khoản (chunking
-T3) hoặc rerank đọc kỹ nội dung (T4).
-
-**Đã giảm thiểu một phần.** `dedupe_by_doc` + oversample ×3 để nhiều Khoản của một Điều
-không chiếm hết top-k.
-
-**Lưu ý khi đọc.** T0 dùng hash embedder nên phần "nhầm theo từ chung" bị phóng đại. Nhưng
-hình mẫu *đúng văn bản, sai Điều* là thuộc tính của dataset, không phải của embedder — cần
-kiểm chứng lại ở T1 với Gemini và **theo dõi riêng như một metric** (tỷ lệ miss mà
-`doc_key` đúng nhưng `article_index` sai).
-
-**✅ Đã kiểm chứng ở T2 và đúng.** Trên toàn corpus với BM25 thật, **65% số miss** là đúng
-văn bản sai Điều. Giả thuyết "thuộc tính của dataset, không phải của embedder" được xác
-nhận. Xem [F-010](#f-010) — nó đã trở thành nút thắt chính của hệ thống.
 
 ---
 
@@ -167,149 +133,6 @@ phải cấu hình mong muốn. Áp dụng lại khi thêm sparse vector ở T4.
 
 ---
 
-## F-007
-### Điểm BM25 không so sánh được giữa các cài đặt
-
-**Loại:** Metric / score incomparability · **Tuần:** T2 · **Trạng thái:** 🟡 đã hiểu, cần nhớ
-
-**Hiện tượng.** Bản BM25 viết từ đầu trong notebook (công thức sách giáo khoa) cho điểm
-`6,247748` trên cùng dữ liệu mà `bm25s` cho `2,499099`. Tỷ lệ đúng bằng **2,5 = k1 + 1**.
-
-**Nguyên nhân.** Lucene — và `bm25s` khi `method="lucene"` — **cố tình bỏ** thừa số `(k1+1)`
-ở tử số:
-
-```
-sách giáo khoa :  idf · tf·(k1+1) / (tf + k1·(1-b+b·dl/avgdl))
-Lucene/bm25s   :  idf · tf        / (tf + k1·(1-b+b·dl/avgdl))
-```
-
-`(k1+1)` là hằng số với mọi document và mọi term ⇒ **không thể đổi thứ hạng**, chỉ đổi thang
-điểm. Bỏ nó tiết kiệm một phép nhân.
-
-**Vì sao đáng ghi lại.** Không phải bug, nhưng là cái bẫy thật:
-
-1. **Đừng đặt ngưỡng cứng lên điểm BM25 thô** (kiểu "chỉ nhận hit nếu score > 5"). Ngưỡng đó
-   vô nghĩa khi đổi thư viện, đổi `method`, hoặc thậm chí đổi `k1`.
-2. Đừng so điểm giữa hai hệ thống retrieval. Chỉ **thứ hạng** so được — và đó cũng là lý do
-   mọi metric trong harness này đều dựa trên thứ hạng, không dựa trên điểm.
-3. Năm biến thể của `bm25s` (`lucene`, `robertson`, `atire`, `bm25l`, `bm25+`) khác nhau ở
-   đúng loại chi tiết này.
-
-**Đã xử lý.** Cell đối chiếu trong `notebooks/02_lexical_search.ipynb` assert **hai** điều:
-thứ hạng trùng khớp tuyệt đối, và điểm trùng khớp sau khi chia `(k1+1)`. Nó giữ vai trò
-canary — nếu `bm25s` đổi công thức ở bản sau, notebook sẽ fail.
-
----
-
-## F-008
-### `bm25s` trả về kết quả điểm 0 và raise khi k > corpus
-
-**Loại:** Library / silent zero-score results · **Tuần:** T2 · **Trạng thái:** ✅ đã sửa
-
-**Hiện tượng.** Hai hành vi của thư viện mà adapter phải sửa:
-
-1. Query không khớp token nào **vẫn** nhận về `k` văn bản tuỳ ý với `score = 0.0`. Không có
-   lỗi, không có cảnh báo.
-2. `k` lớn hơn số văn bản trong corpus thì `retrieve()` raise `ValueError`.
-
-**Vì sao (1) nghiêm trọng.** Trên 61.425 văn bản, một kết quả "tuỳ ý" có xác suất nhỏ nhưng
-khác 0 là chính văn bản đúng ⇒ **metric bị phồng bởi may mắn**. Tệ hơn về mặt trung thực:
-report sẽ khai rằng BM25 "truy hồi được" 10 văn bản cho một câu mà nó chưa khớp một token
-nào. Với một hệ thống mà cả mục đích là *đo cho đúng*, đó là lỗi nghiêm trọng hơn cả sai số.
-
-**Vì sao (2) xuất hiện.** Adapter over-fetch `k × 3` trước khi gộp passage về document, nên
-corpus nhỏ (4 văn bản trong test) kích hoạt ngay.
-
-**Đã sửa** trong `src/retrieve/bm25.py`: lọc bỏ mọi hit `score <= 0`, và clamp `k` theo kích
-thước corpus. Test chặn: `test_zero_score_padding_is_dropped`,
-`test_k_larger_than_corpus_is_clamped_not_raised`.
-
-**Nguyên tắc rút ra.** Khi bọc một thư viện retrieval, luôn hỏi: "nó trả gì khi không tìm
-thấy gì?" Câu trả lời "một danh sách trông rất bình thường" là câu trả lời tệ nhất.
-
----
-
-## F-009
-### Chỉ số tổng hợp che mất một nửa sự thật
-
-**Loại:** Method / aggregate hides churn · **Tuần:** T2 · **Trạng thái:** ✅ đã sửa
-
-**Hiện tượng.** Đổi tokenizer `regex → underthesea` cho **MRR@10 +0,0108** — nhìn như một
-thắng lợi gọn gàng. Nhưng so từng câu trên đúng 788 câu test đó:
-
-| | số câu |
-|---|---|
-| tốt hơn | 183 |
-| **tệ hơn** | **148** |
-| không đổi | 457 |
-
-**331 câu dịch chuyển, 45% đi lùi.** Con số công bố chỉ là *hiệu số* của hai nhóm ngược
-chiều.
-
-**Vì sao nghiêm trọng.** Kết luận rút ra từ metric tổng hợp — "underthesea tốt hơn, chốt" —
-**sai về bản chất**. Sự thật là một cuộc đánh đổi: segmentation là quyết định cứng, một khi
-`đường_cao_tốc` thành một token thì truy vấn được CRF cắt khác đi sẽ không khớp *gì cả*,
-trong khi tokenizer âm tiết luôn khớp một phần. Nó đổi recall-một-phần lấy precision-toàn-phần.
-
-Nếu không thấy 148 câu kia, ta sẽ không bao giờ hỏi "tại sao lại có câu tệ đi?", và sẽ bỏ
-lỡ chính lý do hybrid retrieval (T4) tồn tại.
-
-**Đã sửa.** Report giờ lưu `per_query` (ranking, điểm, metric, latency mỗi câu).
-`src/eval/compare.py` phân nhóm improved/regressed/unchanged theo reciprocal rank và liệt kê
-câu dịch chuyển mạnh nhất mỗi chiều. Dashboard hiển thị biểu đồ churn ngay cạnh delta, kèm
-câu giải thích rằng delta là hiệu số. Test chặn:
-`test_aggregate_can_hide_equal_and_opposite_churn`.
-
-**Nguyên tắc rút ra.** Một thay đổi không bao giờ chỉ có một con số. Luôn hỏi "bao nhiêu câu
-tệ đi?" trước khi nhận một mức lift.
-
----
-
-## F-010
-### Nút thắt thật: đúng văn bản, sai Điều
-
-**Loại:** Retrieval / article resolution · **Tuần:** T2 · **Trạng thái:** 🔴 **nút thắt chính**
-
-**Hiện tượng.** Phân loại 142 câu miss ở k=10 (BM25 `regex`, toàn corpus, 788 câu test) theo
-số hiệu văn bản (phần trước dấu `+` trong corpus id):
-
-| | số câu | % số miss |
-|---|---|---|
-| **đúng văn bản, sai Điều** | **93** | **65%** |
-| sai hẳn văn bản | 49 | 35% |
-
-Ví dụ, chú ý phần trước dấu `+` giống nhau:
-
-```
-cần 03/2013/tt-ttcp+5       nhận 03/2013/tt-ttcp+2, …
-cần 100/2019/nđ-cp+15       nhận 100/2019/nđ-cp+47, …
-cần 58/2010/qh12+3          nhận 58/2010/qh12+28, …
-```
-
-Thấy trực tiếp trong notebook: truy vấn "quay đầu xe cao tốc" trả về `100/2019/nđ-cp+5`
-(đúng) rồi `+7`, `+6`, `+8` — cùng một Nghị định, các Điều xử phạt cho từng loại xe.
-
-**Trần Recall@10 nếu chọn Điều hoàn hảo: 93,8%** (regex) / **95,4%** (underthesea), so với
-86,1% hiện tại.
-
-**Vì sao đây là failure mode quan trọng nhất.** Nó định lại hướng của toàn dự án. ~9 điểm
-recall còn thiếu **không** nằm ở bài toán "tìm đúng luật" — mà ở "chọn đúng Điều trong luật".
-Hai bài toán này cần công cụ khác nhau:
-
-- Tìm văn bản: embedding tốt hơn, hybrid, metadata filter — **sẽ không giúp được gì đáng kể**
-  vì văn bản đã tìm đúng rồi.
-- Chọn Điều: cần tín hiệu ở mức nhỏ hơn Điều (chunking theo Khoản — T3) hoặc một model đọc
-  kỹ nội dung để phân biệt (rerank — T4).
-
-Các Điều trong cùng một Nghị định dùng gần như **cùng bộ từ vựng** ("phạt tiền", "người điều
-khiển", "xe"), khác nhau ở chi tiết mà cả BM25 lẫn embedding cả-Điều đều làm mờ.
-
-**Chưa xử lý.** Đây là nội dung chính của T3/T4. Cần bổ sung ngay một metric hạng nhất:
-*tỷ lệ miss mà `doc_key` đúng nhưng `article_index` sai* — để mọi tuần sau đo được tiến bộ
-trên đúng chiều này.
-
----
-
 ## F-011
 ### 173 Điều không parse được metadata
 
@@ -329,3 +152,105 @@ trong kết quả cho thấy điều đó đã xảy ra.
 
 **Cần làm ở T5.** Xem 173 id đó thực sự có dạng gì, mở rộng parser hoặc chấp nhận và làm cho
 filter **tường minh** về việc loại bỏ bản ghi thiếu metadata (thay vì im lặng).
+
+---
+
+## F-012
+### `failure_log.md` kế thừa từ dự án mẫu chứa entry sai lệch — đã dọn theo quyết định của user
+
+**Loại:** Process / documentation integrity · **Tuần:** T0 (phát hiện Phase 4, xử lý sau đó) · **Trạng thái:** ✅ đã sửa
+
+**Phát hiện (Phase 4).** Khi chạy `PROVIDER=fake make smoke` (Phase 4) và đối chiếu
+`data/processed/ingest_audit.json` thật:
+
+| Chỉ số | F-001 (bản cũ, có sẵn trong file từ commit đầu) | Đo thật (smoke Phase 4 + `ingest_audit.json`) |
+|---|---|---|
+| p50 | 888 | **853** |
+| p90 | 3.515 | **2.914** |
+| p99 | 9.954 | **9.648** |
+| max | **51.862** ký tự | **15.635** |
+| ví dụ Điều dài nhất | `20/2012/qh13+1` | (không xuất hiện trong audit thật) |
+
+Số "đo thật" khớp tuyệt đối với `docs/week0/phase2-report.md` (viết sau khi chạy ingest thật
+ở Phase 2). Số trong F-001 bản cũ thì không khớp bất kỳ lần chạy nào của dự án này.
+
+`git log -- failure_log.md` cho thấy toàn bộ F-001…F-011 (bản cũ) đã được commit trong
+**commit đầu tiên** của repo (`5aeade9`, chỉ có tài liệu, *trước khi* bất kỳ dòng code nào
+tồn tại) — tức **không thể** sinh ra từ một lần `make ingest` thật của dự án này. File này copy
+phần lớn từ dự án mẫu (`../aie-rag-sample-project`). Một số entry (F-002 leakage=24, F-003
+duplicate=102, F-011 metadata=173) tình cờ khớp đúng số thật đo được sau này ở Phase 2 (có thể
+vì cùng dataset với dự án mẫu), nhưng F-001 thì lệch hẳn, và F-004/F-007–F-010 (bản cũ) mô tả
+kết quả BM25/T2 (`notebooks/02_lexical_search.ipynb`, `src/retrieve/bm25.py`) — những file/công
+việc này **chưa tồn tại** trong repo ở T0 (`find` không thấy). Đây đúng là loại lỗi mà
+CLAUDE.md cấm tuyệt đối: "Không tự điền số liệu/kết quả chưa có" — nhưng nó nằm trong file từ
+trước khi Phase 1 bắt đầu, không phải do agent nào trong 4 phase build T0 này viết.
+
+**Xử lý (theo quyết định của user, sau Phase 4).**
+- **F-001** viết lại với số đo thật từ `data/processed/ingest_audit.json` (mean 1.400,2 /
+  p50 853 / p90 2.914 / p99 9.648 / max 15.635 ký tự, slice 500 văn bản gold-covering); giữ
+  nguyên bản chất mối lo (Điều dài có nguy cơ vượt cửa sổ embedding, ẩn dưới `PROVIDER=fake`),
+  bỏ mọi số liệu/dẫn chứng không kiểm chứng được (tỷ lệ Điều vượt cửa sổ token, ví dụ
+  `20/2012/qh13+1`); trạng thái giữ 🔴 vì đây vẫn là rủi ro thật, chưa xử lý.
+- **F-004, F-007, F-008, F-009, F-010** — xoá hoàn toàn (cả hàng bảng lẫn mục `## F-00x`):
+  mô tả công việc BM25/T2 chưa làm trong repo này và trích dẫn file không tồn tại
+  (`src/retrieve/bm25.py`, `notebooks/02_lexical_search.ipynb`).
+- **F-002, F-003, F-005, F-006, F-011, F-013, F-014** — đối chiếu lại với dữ liệu/code thật
+  hiện có trong repo, khớp nên giữ nguyên nội dung; dọn các tham chiếu chéo còn sót lại trỏ
+  tới entry đã xoá.
+
+**Nguyên tắc rút ra.** Áp dụng đúng protocol đã dùng cho sự cố `CLAUDE.md` ở Phase 3 (coi nội
+dung lạ là **untrusted** cho tới khi xác minh được nguồn gốc): trước khi trích số liệu từ bất
+kỳ file "kết quả" nào trong repo để đưa vào report, luôn `git log`/`git blame` để xác nhận số
+đó sinh ra **sau** dòng code đo được nó, không phải nằm sẵn từ commit tài liệu ban đầu.
+
+---
+
+## F-013
+### `ruff format --check` fail vì code Phase 2 chưa format
+
+**Loại:** Harness / lint gap · **Tuần:** T0 (Phase 3) · **Trạng thái:** ✅ đã sửa
+
+**Hiện tượng.** Lần chạy `make lint` đầu tiên ở Phase 3 fail ở bước `ruff format --check`:
+`src/index/qdrant_store.py` (viết ở Phase 2) có một lời gọi `warnings.filterwarnings(...)` bị
+tách thành 3 dòng, không đúng style `ruff format` mong đợi.
+
+**Vì sao đáng ghi lại.** `ruff check` (lint quy tắc) đã sạch từ Phase 2 — chỉ `ruff format
+--check` (format thuần) mới bắt được lỗi này. Hai lệnh khác mục đích và phải chạy **cả hai**
+trong CI/`make lint`, nếu chỉ chạy `ruff check` thì lỗi format kiểu này lọt qua nhiều tuần mà
+không ai biết.
+
+**Đã sửa.** Chạy `ruff format` gộp lời gọi về 1 dòng (thuần format, không đổi logic); xác nhận
+lại `pytest` vẫn 93 passed sau khi format.
+
+**Nguyên tắc rút ra.** `make lint` phải luôn chạy cả `ruff check` **và** `ruff format --check`
+— coi đây là hai gate độc lập, không phải một cái suy ra được từ cái kia.
+
+---
+
+## F-014
+### Gold-coverage forcing hỏng sẽ không báo lỗi — chỉ âm thầm giảm số câu evaluate về gần 0
+
+**Loại:** Harness / silent dilution risk · **Tuần:** T0 (Phase 4) · **Trạng thái:** 🟡 đã giảm thiểu, chưa có test chặn regressive
+
+**Hiện tượng.** Concern mở từ Phase 3: liệu việc ép gold-coverage ở `ingest` (bước 10) có thực
+sự áp dụng **trước** khi `evaluate` lọc golden test split theo `only_indexed=True` hay không —
+nếu thứ tự này hỏng, `evaluate` vẫn chạy **không lỗi**, chỉ trả về một tập câu bị pha loãng gần
+hết. Chạy `PROVIDER=fake make smoke` (Phase 4) xác nhận: `Evaluating 573/788 queries — the
+rest have gold documents outside the current ingest slice` — 573 là con số hợp lý (377 câu
+test được `plan_gold_coverage` chủ đích phủ, cộng thêm các câu khác tình cờ trỏ vào 250 gold
+doc hoặc 250 distractor), không gần 0, nên forcing đang hoạt động đúng.
+
+**Vì sao vẫn đáng lo dù lần này đúng.** Không có gì trong `evaluate` **cảnh báo** nếu con số
+573 tụt xuống, ví dụ, 12 — một refactor vô tình đổi thứ tự `build_passages`/`plan_gold_coverage`
+sẽ cho ra một smoke test **chạy xong, không lỗi, in bảng metric trông bình thường**, nhưng
+metric đó được tính trên vài câu thay vì hàng trăm câu, và không ai biết trừ khi đọc kỹ dòng
+log số lượng.
+
+**Đã giảm thiểu.** Dòng log `Evaluating N/788 queries — ...` được in mỗi lần chạy, nên con số
+573 này giờ trở thành **regression tripwire** thứ hai (bên cạnh bảng metric) — nếu N tụt mạnh ở
+lần chạy sau, đó là dấu hiệu ingest gold-coverage đã hỏng trước khi nhìn tới metric.
+
+**Cần làm.** Thêm assertion/ngưỡng cứng trong `evaluate` hoặc test tích hợp: fail rõ ràng nếu
+`evaluated_queries` tụt dưới một tỷ lệ tối thiểu so với kỳ vọng, thay vì chỉ log và tiếp tục —
+cùng nguyên tắc chung: luôn hỏi "nó trả về gì khi không tìm thấy gì?" trước khi tin một hệ
+thống chạy "không lỗi".
