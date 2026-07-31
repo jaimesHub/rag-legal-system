@@ -28,6 +28,24 @@ LLMProvider.complete(prompt) / .judge(rubric, sample)
 
 ## 1b. Xác nhận dữ liệu thật (T0)
 
+Chạy `make verify` (`GreenNode/zalo-ai-legal-text-retrieval-vn` @ revision
+`12d76d4d04b94ceada970fcfbe7fec20bfa97389`) — toàn bộ 8 check khớp expected=observed:
+corpus 61.425 record, queries 3.298 dòng / 3.196 `_id` duy nhất, qrels train 2.505 nhãn /
+2.432 câu, qrels test 793 nhãn / 788 câu, overlap train∩test 24 câu. 4 giả định ở §1:
+
+1. **Corpus đã chunk sẵn ở mức Điều?** → **Có.** Mẫu `01/2009/tt-bnn+1..5` mỗi record đúng
+   một Điều — xác nhận `chunk_strategy=article` mặc định là hợp lý (giữ nguyên đơn vị record).
+2. **Trung bình nhãn/câu?** → hầu như single-label, không cần metric graded phức tạp cho T0-T1.
+   Test: mean **1.006**, chỉ **5/788** multi-label (0,6%). Train: mean **1.03**, **66/2.432**
+   multi-label (2,7%).
+3. **Leakage train↔test?** → **24** query id xuất hiện ở cả `qrels/train.jsonl` và
+   `qrels/test.jsonl`. Đã loại khỏi **dev** (còn 2.408 câu), giữ nguyên trong **test** (788
+   câu) — xem `failure_log.md` F-002.
+4. **Dòng trùng `_id` trong `queries.jsonl`?** → **102** dòng trùng trên tổng 3.298 dòng
+   (3.196 `_id` duy nhất) — dedupe giữ dòng đầu tiên. Xem F-003.
+
+Không có giả định nào ở §1 cần sửa — cả 4 điều đúng như kỳ vọng ban đầu.
+
 ---
 
 ## 2. Kiến trúc (pipeline end-to-end)
@@ -68,7 +86,7 @@ LLMProvider.complete(prompt) / .judge(rubric, sample)
 
 | Tuần | Syllabus | Làm gì | Deliverable | Status |
 |------|-----------------|--------|-------------|--------|
-| **T0** | **01 — Tổng quan** | Skeleton repo, Docker Qdrant, lớp abstraction, index 500 docs → vector search thô | Smoke test | ⬜ TODO |
+| **T0** | **01 — Tổng quan** | Skeleton repo, Docker Qdrant, lớp abstraction, index 500 docs → vector search thô | Smoke test | ✅ [week0](../reports/week0.md) |
 | **T1** | **02** — Evaluating Search Systems | Golden set, split dev/test, metrics (Recall/MRR/MAP/nDCG), DeepEval + LLM-as-judge | **#5** Eval Harness | ⬜ TODO |
 | **T2** | **03** — Lexical Search (BM25) | VN tokenize, BM25 tuning (k1/b/length norm), đo vs baseline | **#6** Dashboard (bản đầu) | ⬜ TODO |
 | **T3** | **04** — Semantic Search (Vector) | Ingestion chuẩn (clean→chunk→embed→upsert), thử dimension, đo vs BM25 | **#1** Ingestion | ⬜ TODO |
