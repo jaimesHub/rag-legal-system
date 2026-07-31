@@ -87,9 +87,7 @@ class QdrantStore:
                 with warnings.catch_warnings():
                     # In-memory Qdrant (used by tests) ignores payload indexes and
                     # says so loudly; the call is still correct against a server.
-                    warnings.filterwarnings(
-                        "ignore", message=".*Payload indexes have no effect.*"
-                    )
+                    warnings.filterwarnings("ignore", message=".*Payload indexes have no effect.*")
                     self._client.create_payload_index(
                         collection_name=self._collection,
                         field_name=field,
