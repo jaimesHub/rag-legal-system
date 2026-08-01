@@ -1,4 +1,4 @@
-.PHONY: help up down logs sync fetch verify golden ingest index search eval smoke test lint fmt clean
+.PHONY: help up down logs sync fetch verify golden ingest index search eval smoke compare-sample test lint fmt clean
 .DEFAULT_GOAL := help
 
 # Number of corpus documents ingest/smoke pull in. T0 smoke scope is 500 per
@@ -61,6 +61,9 @@ eval: ## Evaluate on split=test, e.g. make eval RETRIEVER=vector LABEL=t0-baseli
 
 smoke: ## T0 deliverable: verify -> golden -> ingest -> index -> evaluate, one command. LIMIT=0 = full corpus
 	uv run python -m src.cli smoke --limit $(LIMIT) --k $(K)
+
+compare-sample: ## Scorecard vs dự án mẫu cho 1 tuần, e.g. make compare-sample WEEK=2 CS_ARGS="--emit-md"
+	uv run python -m src.cli compare-sample --week $(WEEK) $(CS_ARGS)
 
 test: ## Run the offline test suite (tests marked `live` are deselected by default)
 	uv run pytest --cov=src --cov=config --cov-report=term-missing -q

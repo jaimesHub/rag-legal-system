@@ -3,20 +3,25 @@
 T0 scope only: verify-dataset / build-golden / ingest / index / search /
 evaluate / smoke, plus the optional `fetch` pre-download. Commands that need
 BM25 or a dashboard (tokens/sweep/compare/view-eval) are T2 — deliberately not
-here yet, see docs/t0.md step 14.
+here yet, see docs/t0.md step 14. Exception: `compare-sample` (cross-project
+weekly scorecard vs the sample repo) is added ahead of T2 — see
+docs/comparison-framework.md.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 import time
+from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from config.settings import Settings, get_settings
+from src.eval import compare_sample as cs
 from src.eval.golden import build_golden, load_golden
 from src.eval.harness import EvalReport, evaluate_retriever, save_report
 from src.index.qdrant_store import QdrantStore
@@ -346,6 +351,120 @@ def smoke(
     console.rule("5/5 evaluate")
     evaluate(split="test", retriever="vector", k=k, limit=0, label="t0-smoke")
     console.rule("[green]smoke complete[/]")
+
+
+def _print_compare_sample(result: dict) -> None:
+    week = result["week"]
+    console.rule(f"[bold]So với dự án mẫu — T{week}[/] (overall: {result['overall']})")
+
+    axes_table = Table("Trục", "Trạng thái", "Bằng chứng", title="Scorecard 7 trục")
+    for name, axis in result["axes"].items():
+        axes_table.add_row(name, axis["status"], axis["evidence"])
+    console.print(axes_table)
+
+    metric = result["metric"]
+    if metric.get("comparable"):
+        mt = Table("metric", "current", f"sample ({metric['sample_label']})", "Δ")
+        for m in sorted(metric["current"]):
+            delta = metric["delta"][m]
+            color = "green" if delta >= 0 else "red"
+            mt.add_row(
+                m,
+                f"{metric['current'][m]:.4f}",
+                f"{metric['sample'][m]:.4f}",
+                f"[{color}]{delta:+.4f}[/]",
+            )
+        console.print(mt)
+        bonus = "≥ mẫu (bonus)" if metric.get("beats_sample") else "chưa vượt mẫu (không phải cửa)"
+        console.print(f"Bar (quyết định 3): có số thật + giải thích = ĐẠT. {bonus}.")
+    else:
+        console.print(f"[yellow]➖ Metric chưa so được:[/] {(metric.get('reasons') or ['?'])[0]}")
+
+    cur = result["structural"]["current"]
+    smp = result["structural"]["sample"]
+    console.print(
+        f"\n[dim]struct: current src={cur['src_files']} cli={cur['cli_commands']} "
+        f"targets={cur['make_targets']} tests={cur['test_functions']} F={cur['failure_entries']} | "
+        f"sample src={smp['src_files']} cli={smp['cli_commands']} targets={smp['make_targets']} "
+        f"tests={smp['test_functions']} F={smp['failure_entries']}[/]"
+    )
+
+
+@app.command(name="compare-sample")
+def compare_sample_cmd(
+    week: int = typer.Option(..., "--week", "-w", help="Tuần cần so (0..8)."),
+    retriever: str = typer.Option("", help="Retriever anchor; rỗng = mặc định theo tuần."),
+    report: Path | None = typer.Option(None, help="Report cụ thể; mặc định = run test mới nhất."),
+    sample_baselines: Path = typer.Option(
+        Path("docs/sample-baselines.yaml"), help="File số chuẩn của mẫu."
+    ),
+    current_root: Path | None = typer.Option(None, help="Gốc dự án hiện tại (mặc định base_dir)."),
+    sample_root: Path = typer.Option(Path("../aie-rag-sample-project"), help="Gốc dự án mẫu."),
+    emit_md: bool = typer.Option(False, "--emit-md", help="In block markdown để dán vào report."),
+    json_out: Path | None = typer.Option(None, "--json", help="Ghi kết quả JSON ra path."),
+    validate_sample: bool = typer.Option(
+        False, "--validate-sample", help="Cảnh báo nếu HEAD của mẫu khác sample_commit trong YAML."
+    ),
+) -> None:
+    """Scorecard 7 trục + guard metric cùng-cấu-hình vs dự án mẫu (docs/comparison-framework.md).
+
+    Luôn exit 0 — đây là bảng điểm tham chiếu, KHÔNG phải cổng build.
+    """
+    settings = get_settings()
+    root = current_root or settings.base_dir
+    baselines_path = sample_baselines if sample_baselines.is_absolute() else root / sample_baselines
+
+    result = cs.compare_sample(
+        week=week,
+        current_root=root,
+        sample_root=sample_root,
+        baselines_path=baselines_path,
+        eval_dir=settings.artifacts_dir / "eval",
+        retriever=retriever or None,
+        report_path=report,
+    )
+
+    if validate_sample:
+        head = _sample_head(sample_root)
+        pinned = result.get("sample_commit")
+        if head and pinned and head != pinned:
+            console.print(
+                f"[yellow]⚠ sample HEAD {head[:10]} ≠ sample_commit {str(pinned)[:10]} (YAML)[/] "
+                "— chép lại số mẫu rồi cập nhật meta.sample_commit."
+            )
+        elif head and pinned:
+            console.print("[green]✓ sample_commit khớp HEAD của mẫu.[/]")
+
+    _print_compare_sample(result)
+
+    if json_out is not None:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        console.print(f"\nJSON: {json_out}")
+    else:
+        default_json = settings.artifacts_dir / "compare_sample" / f"compare_sample_week{week}.json"
+        default_json.parent.mkdir(parents=True, exist_ok=True)
+        default_json.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        console.print(f"\nJSON: {default_json}")
+
+    if emit_md:
+        console.rule("markdown")
+        console.print(cs.to_markdown(result))
+
+
+def _sample_head(sample_root: Path) -> str | None:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(sample_root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
 
 
 if __name__ == "__main__":
