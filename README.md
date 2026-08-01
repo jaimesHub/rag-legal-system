@@ -113,8 +113,16 @@ git clone <repo-này> rag-legal-system
 git clone https://github.com/ContextBoxAI/aie-rag-sample-project   # đặt cạnh nhau
 cd rag-legal-system && uv sync && make up        # Qdrant qua Docker
 ```
-> `compare-sample` mặc định đọc mẫu ở `../aie-rag-sample-project` (đổi bằng `--sample-root`). Số
-> chuẩn của mẫu lấy từ [`docs/sample-baselines.yaml`](docs/sample-baselines.yaml) (đã commit), **không** cần chạy eval của mẫu.
+> `compare-sample` mặc định đọc repo mẫu ở `../aie-rag-sample-project` (hai repo đặt cạnh nhau).
+> Đổi vị trí đó bằng `--sample-root PATH`, truyền qua `CS_ARGS` — ví dụ
+> `make compare-sample WEEK=2 CS_ARGS="--sample-root /duong/dan/aie-rag-sample-project"`.
+> `--sample-root` trỏ tới **bản checkout git** của mẫu và chỉ dùng cho hai việc: (1) **trục 1 —
+> cấu trúc**: chụp snapshot bộ module của mẫu trên đĩa để so scope (`structural_snapshot`); (2)
+> `--validate-sample`: chạy `git -C <sample-root> rev-parse HEAD` để cảnh báo nếu HEAD mẫu đã đi
+> trước `meta.sample_commit` ghi trong YAML (dấu hiệu số đang chép có thể đã cũ). **Số benchmark
+> của mẫu KHÔNG đọc từ đây** mà từ [`docs/sample-baselines.yaml`](docs/sample-baselines.yaml) (đã
+> commit) — nên nếu chỉ cần so metric thì không bắt buộc có repo mẫu trên máy; `--sample-root`
+> chỉ cần khi muốn chấm trục cấu trúc hoặc chạy `--validate-sample`.
 
 ### Bước 1 — Sinh số của dự án này cho tuần cần so
 - **Tuần cấu trúc (T0/T1):** `PROVIDER=fake make smoke` (offline) là đủ.
