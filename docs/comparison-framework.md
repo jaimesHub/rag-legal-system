@@ -149,6 +149,19 @@ Flags passthrough qua `CS_ARGS`: `--retriever`, `--report PATH`, `--current-root
 `--sample-root PATH`, `--json PATH`, `--emit-md`, `--validate-sample`. Kết quả JSON luôn được
 ghi (mặc định `artifacts/compare_sample/compare_sample_week{N}.json`, gitignored).
 
+**`--sample-root PATH`** (mặc định `../aie-rag-sample-project`, khai báo ở `src/cli.py`) trỏ tới
+**bản checkout git** của repo mẫu và chỉ được dùng ở đúng hai chỗ trong `compare_sample.py`:
+1. **Trục 1 — cấu trúc:** `structural_snapshot(sample_root)` đếm bộ module của mẫu trên đĩa để so
+   scope với dự án này (`structural_snapshot(current_root)`).
+2. **`--validate-sample`:** `_sample_head(sample_root)` chạy `git -C <sample-root> rev-parse HEAD`,
+   cảnh báo nếu HEAD mẫu đã đi trước `meta.sample_commit` trong YAML (số đang chép có thể đã cũ).
+
+**Số benchmark của mẫu KHÔNG đọc từ `--sample-root`** mà từ `docs/sample-baselines.yaml` (đã
+commit) — nên nếu chỉ cần hàng metric (trục 3), không bắt buộc phải có repo mẫu trên máy;
+`--sample-root` chỉ cần khi chấm trục 1 hoặc chạy `--validate-sample`. Đây chính là lý do
+`sample-baselines.yaml` tồn tại: mẫu để `artifacts/` gitignored → số chuẩn phải curate tay vào
+YAML thay vì đọc động từ filesystem của mẫu.
+
 **Quy tắc thời điểm:** chạy `compare-sample WEEK=N` vào **CUỐI tuần N**, sau khi đã viết
 `reports/weekN.md` và log ≥3 failure. Chạy cho một tuần chưa làm sẽ ra `overall: behind` — không
 phải vì tool phát hiện vấn đề kỹ thuật, mà đơn giản vì `reports/weekN.md` và ≥3 failure entry gắn
