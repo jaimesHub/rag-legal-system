@@ -1,6 +1,6 @@
 # Phase 1 (T0 bước 1–6) — Tóm tắt
 
-**Phạm vi:** Hoàn tất bước 1–6 trong `docs/t0.md` — scaffold cơ sở, cấu hình, schemas, và lớp providers.
+**Phạm vi:** Hoàn tất bước 1–6 trong `docs/week0/t0.md` — scaffold cơ sở, cấu hình, schemas, và lớp providers.
 
 Mục tiêu: xây dựng nền tảng cho pipeline RAG, đảm bảo mọi import đều hoạt động, cấu hình tách rời môi trường, và các provider (Gemini thật + Fake offline) sẵn sàng cho các bước tiếp theo (ingest, index, retrieve).
 

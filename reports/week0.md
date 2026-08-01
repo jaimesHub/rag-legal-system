@@ -6,7 +6,7 @@
 ## Câu hỏi của tuần
 
 > Pipeline end-to-end (dataset → chunk → embed → Qdrant → retrieve → metric) có chạy được
-> bằng **một lệnh**, và dataset có đúng như plan §1 giả định không? (`docs/t0.md`)
+> bằng **một lệnh**, và dataset có đúng như plan §1 giả định không? (`docs/week0/t0.md`)
 
 **Trả lời ngắn:** Có, cả hai. `PROVIDER=fake make smoke` chạy hết verify → golden → ingest →
 index → evaluate trong một lệnh, không lỗi, không cần mạng ngoài HF (dataset cache local) hay
@@ -112,7 +112,7 @@ test) chờ đến T2/T3.
 evaluate), chạy xong không lỗi trong ~vài giây (ingest 2,4s + index/upsert 2,3s), không cần
 `GEMINI_API_KEY`, không cần mạng ngoài truy cập Hugging Face Hub (có cache local).
 
-## Exit criteria (`docs/t0.md`)
+## Exit criteria (`docs/week0/t0.md`)
 
 - [x] Skeleton repo đúng cấu trúc plan §5 (`config/`, `src/`, `data/`, `tests/`, …)
 - [x] Qdrant chạy local qua Docker (named dense vector `"dense"`, cosine distance)

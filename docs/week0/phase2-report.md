@@ -1,6 +1,6 @@
 # Phase 2 (T0 bước 7–13) — Báo cáo
 
-**Phạm vi:** Hoàn tất bước 7–13 trong `docs/t0.md` — biến các stub Phase 1 thành logic thật cho toàn bộ pipeline: `ingest → index → retrieve → eval`.
+**Phạm vi:** Hoàn tất bước 7–13 trong `docs/week0/t0.md` — biến các stub Phase 1 thành logic thật cho toàn bộ pipeline: `ingest → index → retrieve → eval`.
 
 **Câu hỏi tuần (T0):** pipeline end-to-end (dataset → chunk → embed → Qdrant → retrieve → metric) có chạy được không, và dataset có đúng như plan §1 giả định không? → Phase 2 trả lời phần lớn: pipeline chạy được offline (`PROVIDER=fake`), và 4 giả định dữ liệu đã được xác nhận bằng số thật.
 

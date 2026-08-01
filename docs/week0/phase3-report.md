@@ -2,7 +2,7 @@
 
 ## Tổng quát
 
-Hoàn tất bước 14–16 trong `docs/t0.md` — ráp toàn bộ logic Phase 2 thành CLI (Typer) + Makefile + test suite đầy đủ. Phạm vi **CHỈ Phase 3**; chưa chạy `make smoke` chính thức (bước 17, thuộc Phase 4).
+Hoàn tất bước 14–16 trong `docs/week0/t0.md` — ráp toàn bộ logic Phase 2 thành CLI (Typer) + Makefile + test suite đầy đủ. Phạm vi **CHỈ Phase 3**; chưa chạy `make smoke` chính thức (bước 17, thuộc Phase 4).
 
 ---
 
