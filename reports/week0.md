@@ -126,6 +126,42 @@ evaluate), chạy xong không lỗi trong ~vài giây (ingest 2,4s + index/upser
 
 Tất cả 8 mục exit criteria của T0 đã đạt.
 
+## So với dự án mẫu (T0)
+
+> Nguồn số mẫu: `docs/sample-baselines.yaml` (chép tay từ report đã commit của mẫu).
+> Hàng metric chỉ hiện khi cùng cấu hình (revision + split=test + full corpus + 788 câu);
+> nếu không, đánh ➖ kèm lý do. Không bịa số. Sinh bởi
+> `make compare-sample WEEK=0 CS_ARGS="--emit-md --json artifacts/compare_sample/week0.json"`,
+> chạy lại sau khi thêm mục này để xác nhận trục 4 lật ✅ (xem cột "Bằng chứng").
+
+### Scorecard 7 trục
+
+| Trục | Trạng thái | Bằng chứng |
+|------|:----------:|------------|
+| 1. structure | ✅ | src 25 files vs mẫu 29; không thiếu module tuần; mẫu có thêm `src/retrieve/bm25.py`, `src/retrieve/splade.py`, `src/ingest/tokenize.py`, `src/rank`, `src/generate`, `dashboard`, `notebooks` — mẫu đã tới T2+, đúng dự kiến. |
+| 2. tests | ✅ (người xác nhận) | Tool đếm 🟡 (12 files / 115 funcs, mẫu 15/179) vì chỉ đếm không chạy. Người xác nhận: `uv run pytest -q` → **115 passed**, 0 failed — xanh thật tại thời điểm ghi (2026-08-01). |
+| 3. metrics | ➖ | Số T0 là tripwire fake-embedder trên slice 500-doc gold-covering (573/788 câu evaluate) — không phải số chất lượng, không so được với mẫu (mẫu benchmark full-corpus 61.425 doc / 788 câu). Head-to-head thật bắt đầu từ T2 (BM25/underthesea). Đây là thiết kế, không phải thiếu sót. |
+| 4. docs | ✅ (sau khi thêm mục này) | Mục "So với dự án mẫu (T0)" này chính là phần còn thiếu — trước khi thêm, tool báo 🟡 vì `reports/week0.md` chưa có chuỗi con "So với dự án mẫu". Sau khi thêm, re-run `compare-sample WEEK=0` xác nhận lật ✅ (xem bước Verify bên dưới). |
+| 5. failure-log | ✅ | 8 entry gắn `**Tuần:** T0` (F-001…F-014, mới thêm ở Phase 4: F-012/13/14) — đạt ngưỡng ≥3. |
+| 6. reproducibility | ✅ | `context.dataset_revision` khớp pin `12d76d4d…`; report `artifacts/eval/eval_test_t0-smoke_20260731T134929+0000.json` có đủ provenance; tái lập bằng `PROVIDER=fake make smoke`. |
+| 7. git | ✅ (người xác nhận) | Tool đếm 🟡 (11 commit nhắc T0/week0, heuristic substring). Người xác nhận: T0 ship theo 4 phase commit (`f4bd597`→`0c84860`) với report + failure_log + plan §1b cùng landing ở `f3b5edc` (docs(t0): week0 report + plan §1b số thật, đóng dấu T0 DONE) và `a5ef65b` (failure-log F-012/13/14) — đúng nghi thức "report+failure_log+plan-status cùng landing". |
+
+### Metric (chỉ khi cùng cấu hình)
+
+➖ Không so được ở T0 theo thiết kế: số hiện tại là tripwire fake-embedder / slice 500-doc / 573 câu
+(không phải benchmark 788-câu full-corpus 61.425 doc mà `sample-baselines.yaml` yêu cầu để so
+head-to-head). Same-config guard trong `compare_sample.py` từ chối in bảng số vì lẫn hai thứ không
+so được là vô nghĩa, không phải vì công cụ lỗi. Real head-to-head đầu tiên (BM25 + underthesea,
+full corpus, split test) dự kiến ở T2.
+
+**Bar (quyết định 3):** có số thật + giải thích per-query = ĐẠT. Vượt mẫu là bonus. T0 là tuần
+skeleton/cấu trúc (trục 3 = ➖ theo `docs/comparison-framework.md` bảng "Trục 3 bật ở tuần nào"),
+nên không áp dụng bar này tuần này.
+
+**Kết luận (một câu):** ở T0, dự án này on-track so với mẫu trên cấu trúc/quy trình (structure,
+tests, failure-log, reproducibility, git đều ✅ sau xác nhận tay); mẫu rộng hơn vì đã ở T2+
+(bm25/splade/tokenize/dashboard) — điều này kỳ vọng vì mẫu đi trước, không phải dự án này tụt hậu.
+
 ## Hướng T1
 
 T1 xây Eval Harness đầy đủ theo `docs/plan.md` §6: DeepEval + LLM-as-judge, calibrate với
