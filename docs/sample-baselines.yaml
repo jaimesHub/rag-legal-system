@@ -1,0 +1,87 @@
+# Source-of-truth for the SAMPLE project's numbers, per week (T0..T8).
+#
+# Why this file exists: the sample project's artifacts/ (eval JSON) are gitignored
+# and do not exist at rest, so its authoritative numbers live only in its committed
+# reports/weekN.md + README.md. This file makes those numbers machine-readable for
+# `make compare-sample` WITHOUT inventing anything — every metric entry cites the
+# source report + the exact config + the sample commit it was transcribed from.
+#
+# MAINTENANCE (weekly ritual): when the sample publishes a new week, transcribe its
+# numbers here, bump meta.sample_commit, and run `compare-sample --validate-sample`
+# to confirm the transcription still matches the sample's report.
+#
+# NEVER invent numbers. `metric_comparable: false` (with a reason) is the correct
+# entry for any week the sample has not published a real full-corpus/788-test number.
+
+meta:
+  sample_repo: ../aie-rag-sample-project
+  sample_commit: 2819aa3536f947b670e39c63e8594fedd201b595  # git -C ../aie-rag-sample-project rev-parse HEAD at transcription
+  dataset_revision: 12d76d4d04b94ceada970fcfbe7fec20bfa97389
+  benchmark_split: test
+  benchmark_n_queries: 788
+  full_corpus_documents: 61425
+
+weeks:
+  T0:
+    status: done
+    metric_comparable: false
+    reason: "Số T0 là tripwire fake-embedder trên slice 500-doc gold-covering — không phải số chất lượng, không so được."
+
+  T1:
+    status: partial
+    metric_comparable: false
+    notes: "Tuần eval-harness: mẫu có per-query + compare.py; LLM-as-judge/calibration/regression-gate còn dở. Không có retriever number mới để so metric."
+
+  T2:
+    status: done
+    metric_comparable: true
+    source: reports/week2.md
+    config:
+      retriever: bm25
+      corpus_documents: 61425
+      n_queries: 788
+      split: test
+      chunk_strategy: article
+      params: {k1: 1.5, b: 0.75, method: lucene}
+    variants:
+      - label: bm25-regex
+        tokenizer: regex
+        metrics: {recall@1: 0.4327, recall@5: 0.7532, recall@10: 0.8198, mrr@10: 0.5677, ndcg@10: 0.6290}
+        latency_ms: {p95: 1.18}
+      - label: bm25-pyvi
+        tokenizer: pyvi
+        metrics: {recall@1: 0.4327, recall@5: 0.7640, recall@10: 0.8522, mrr@10: 0.5730, ndcg@10: 0.6403}
+      - label: bm25-underthesea
+        tokenizer: underthesea
+        canonical: true   # "the number to beat" (README + plan §2)
+        metrics: {recall@1: 0.4391, recall@5: 0.7640, recall@10: 0.8610, mrr@10: 0.5785, ndcg@10: 0.6465}
+
+  T3:
+    status: todo
+    metric_comparable: false
+    reason: "Sample chưa công bố T3 (vector/dense)."
+
+  T4:
+    status: todo
+    metric_comparable: false
+    reason: "Sample chưa công bố T4 (hybrid + rerank)."
+
+  T5:
+    status: todo
+    metric_comparable: false
+    reason: "Sample chưa công bố T5 (metadata filter)."
+
+  T6:
+    status: todo
+    metric_comparable: false
+    reason: "Sample chưa công bố T6 (knowledge graph / filesystem)."
+
+  T7:
+    status: todo
+    metric_comparable: false
+    reason: "Sample chưa công bố T7 (doc parsing / multimodal). Lưu ý: metric OCR trên tập bổ sung, không so trên 788."
+
+  T8:
+    status: todo
+    metric_comparable: false
+    reason: "Sample chưa công bố T8 (final / production report)."

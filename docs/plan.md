@@ -189,5 +189,9 @@ final-project/
 2. **Giữa tuần** — build, cố tình chạm failure, log lại.
 3. **Cuối tuần** — chạy `make eval`, viết `reports/weekN.md` (số liệu + lift + ≥3 failure + "tại sao").
 4. Cập nhật `failure_log.md` — nguyên liệu cho Production Report cuối.
+5. Sau khi viết xong `reports/weekN.md`, chạy `make compare-sample WEEK=N CS_ARGS="--emit-md"` và
+   dán block "So với dự án mẫu (T{N})" mà nó sinh ra vào cuối `reports/weekN.md`, trước Exit
+   criteria (xem `docs/comparison-framework.md`). Nếu dự án mẫu đã công bố số cho tuần đó, chép
+   số vào `docs/sample-baselines.yaml` và bump `meta.sample_commit` trước khi chạy bước này.
 
 ---
