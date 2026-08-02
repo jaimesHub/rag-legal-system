@@ -62,24 +62,92 @@ những lệnh đó thuộc T1/T2/T8, chưa tồn tại.
 
 ## Kiến trúc
 
-Pipeline một chiều `ingest → index → retrieve → rank → generate`, mỗi lớp đo bằng eval
-harness; chi tiết đầy đủ + sơ đồ ở [`docs/plan.md` §2](docs/plan.md#2-kiến-trúc-pipeline-end-to-end).
+**Pipeline một chiều** `ingest → index → retrieve → rank → generate`, mỗi lớp đo bằng eval
+harness. Chi tiết đầy đủ + sơ đồ ở [`docs/plan.md` §2](docs/plan.md#2-kiến-trúc-pipeline-end-to-end).
+
+### Thư mục & lớp
 
 ```
-config/settings.py   .env → {provider, embed_model, dim, collection, dataset_revision, ...}
-src/providers/        EmbeddingProvider.embed(texts, task_type) · LLMProvider.complete/judge
-                       gemini.py (thật) · fake.py (offline, tất định) · registry.py (config → impl)
-src/ingest/            loader (HF pin) · clean (NFC) · metadata · chunk (Điều/Khoản) · pipeline
-src/index/             Qdrant: named dense vector "dense", payload index cho filter (T5)
-src/retrieve/          base.py = contract retrieve(query, k) → [(doc_id, score)] · vector.py
-src/eval/              golden (dev/test + leakage guard) · metrics · harness (per-query) · compare*
-src/cli.py             entrypoint cho mọi target Makefile (Typer)
+rag-legal-system/
+├── config/
+│   └── settings.py          ⚙️ Source of truth — .env → {provider, embed_model, 
+│                               embed_dim, collection, dataset_revision, …}
+│
+├── src/
+│   ├── schemas.py           📋 Contract dùng chung (Passage, GoldenExample, …)
+│   ├── cli.py               🎯 Entrypoint Makefile (Typer)
+│   │
+│   ├── providers/           🔌 Abstraction: EmbeddingProvider · LLMProvider
+│   │   ├── base.py
+│   │   ├── gemini.py        ✨ Adapter thật (Gemini API)
+│   │   ├── fake.py          🎲 Adapter offline (hash embedder)
+│   │   └── registry.py      🔄 Config → impl
+│   │
+│   ├── ingest/              📥 Data pipeline
+│   │   ├── loader.py        ↓ HF pin (61.425 Điều + 3.196 câu)
+│   │   ├── clean.py         ↓ NFC normalize
+│   │   ├── chunk.py         ↓ Split Điều/Khoản
+│   │   ├── metadata.py      ↓ Parse corpus_id → loại/năm/cơ quan
+│   │   └── pipeline.py      → data/processed/
+│   │
+│   ├── index/               🔗 Vector DB interface
+│   │   └── qdrant.py        ↓ Qdrant client, named vector "dense",
+│   │                         ↓ payload index cho filter (T5)
+│   │
+│   ├── retrieve/            🔍 Retriever implementations
+│   │   ├── base.py          ↓ Contract: retrieve(query, k) → [(doc_id, score)]
+│   │   ├── vector.py        ✅ Vector search (T0)
+│   │   ├── bm25.py          🔲 BM25 (T2+)
+│   │   └── hybrid.py        🔲 Hybrid (T2+)
+│   │
+│   ├── rank/                🔲 Re-ranking (T2+) — chưa tồn tại
+│   ├── generate/            🔲 LLM generation (T3+) — chưa tồn tại
+│   │
+│   └── eval/                ✅ Evaluation harness
+│       ├── golden.py        ↓ dev/test split + leakage guard
+│       ├── metrics.py       ↓ Recall@k, NDCG, …
+│       ├── harness.py       ↓ Per-query evaluation
+│       └── compare.py       → compare-sample (7 trục so mẫu)
+│
+├── tests/
+│   ├── unit/                ✅ Logic tests (pytest) — schema, utils, config
+│   ├── integration/         ✅ End-to-end pipeline (smoke test, eval harness)
+│   └── live/                🔲 Deselect mặc định (gọi API thật, tốn tiền)
+│
+├── data/
+│   ├── raw/                 💾 git-ignored; HF download → cache
+│   ├── processed/           💾 git-ignored; ingest output
+│   └── golden/              ✅ Committed; dev/test split (ổn định)
+│
+├── docs/
+│   ├── plan.md              📖 Hub: roadmap 8 tuần, quyết định kiến trúc
+│   ├── comparison-framework.md  📋 Rubric so mẫu (7 trục): structure/process/
+│   │                            metrics/test/harness/failure/git — cách đọc
+│   │                            scorecard từ `make compare-sample`
+│   ├── sample-baselines.yaml    📊 Baseline từ dự án mẫu (T0/T2): metric,
+│   │                            commit, dataset version — thay vì chạy mẫu
+│   │                            lại mỗi lần, dùng YAML pin để so nhanh
+│   ├── week0/, week1/, …    📝 Checklist + report mỗi tuần
+│   └── failure-analysis.md  🔴 Catalog failure case (F-001, F-002, …): ghi
+│                            nguyên nhân & giải pháp từng tuần (≥3 case/tuần),
+│                            tránh lặp lại + input cho Production Report
+│
+├── notebooks/               📓 From-scratch learning + canaries
+├── reports/                 📄 Weekly reports + artifacts/
+├── dashboard/               🔲 T8 — chưa tồn tại
+│
+├── Makefile                 🎯 1-1 với src/cli.py
+├── pyproject.toml           📦 uv package=false
+├── docker-compose.yml       🐳 Qdrant service
+└── .env.example             🔑 Mẫu config
 ```
 
-*`src/rank/`, `src/generate/`, `dashboard/`, BM25/hybrid retriever chưa tồn tại — đến ở
-T2 trở đi theo [roadmap](docs/plan.md#3-lộ-trình-8-tuần).*
+**Mũi tên & trạng thái:**
+- ✅ = Có (T0+)
+- 🔲 = Chưa tồn tại (T2+ trở đi)
+- ↓ = Hướng dữ liệu trong pipeline
 
-**Bốn bất biến**, cưỡng chế bằng code, không bằng quy ước:
+### Bốn bất biến, cưỡng chế bằng code, không bằng quy ước:
 
 1. **`test` là split benchmark của mọi tuần; `dev` không dùng để eval** — để dành cho fine-tune
    embedding sau này, không có khái niệm "tune trên dev rồi mở test" cần bảo vệ ở đây.
